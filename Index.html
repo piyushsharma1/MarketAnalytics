@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<!--
+To change this license header, choose License Headers in Project Properties.
+To change this template file, choose Tools | Templates
+and open the template in the editor.
+-->
+<html>
+    <head>
+        <style>
+            svg:first-child > g > text[text-anchor~=middle]{
+                font-size:16px;
+            }
+        </style>
+        <script type = "text/JavaScript" src = "mqttws31.js"> </script>
+        <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+        <script type="text/javascript">
+
+            var chart;
+            var sumChart;
+            var Vavgf;
+            var Vavgm;
+            var VavgAge;
+            var VavgiOS;
+            var VavgAndroid;
+            var avgf = 0;
+            var avgm = 0;
+            var avgAge = 0;
+            var avgiOS = 0;
+            var avgAndroid = 0;
+            var client;
+            var count = 1;
+            var gaugeData;
+            var gaugeData1;
+            var gaugeData2;
+            var gaugeOptions;
+
+            // Load the packages from google charts
+            google.charts.load('current', {'packages': ['gauge']});
+            google.charts.setOnLoadCallback(initDrawGraph);
+
+            function initDrawGraph() {
+
+                // This data is specific to the dice. Initial value set to 1. 
+                gaugeData = google.visualization.arrayToDataTable([
+                    ['Label', 'Value'],
+                    ['% Females', 0],
+                    ['% Males', 0]
+                ]);
+
+                gaugeData1 = google.visualization.arrayToDataTable([
+                    ['Label', 'Value'],
+                    ['Avg Age', 0]
+                ]);
+                gaugeData2 = google.visualization.arrayToDataTable([
+                    ['Label', 'Value'],
+                    ['% iOS Users', 0],
+                    ['% Android', 0]
+                ]);
+
+
+                // Create the design for the gauge with 1-6 ticks.
+                gaugeOptions = {
+                    width: 800, height: 300,
+                    majorTicks: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+                    min: 0,
+                    max: 100
+                };
+
+                //Get the div in which chart must be added.
+                Vavgf = new google.visualization.Gauge(document.getElementById('chart_avgf'));
+                //Vavgm = new google.visualization.Gauge(document.getElementById('chart_avgm'));
+                VavgAge = new google.visualization.Gauge(document.getElementById('chart_avgAge'));
+                VavgAndroid = new google.visualization.Gauge(document.getElementById('chart_avgAndroid'));
+                //VavgiOS = new google.visualization.Gauge(document.getElementById('chart_avgiOS'));
+                drawChart();
+            }
+
+            function doConnect() {
+                // Create a client instance unique client ID 
+                client = new Paho.MQTT.Client('broker.hivemq.com', 8000, 'rbhargav1');
+
+                //Set callback handlers
+                client.onConnect = onConnect;
+                client.onMessageArrived = onMessageArrived;
+                client.onConnectionLost = onConnectionLost;
+
+                //Connect the client
+                client.connect({onSuccess: onConnect});
+            }
+
+            //Function called to subscribe to Topic diceRoll
+            function doSubscribe() {
+                client.subscribe("rbhargav/MDTDATA");
+            }
+
+            //Disconnect the client
+            function doDisconnect() {
+                client.disconnect();
+                //alert("Disconnected");
+            }
+
+            //function called when client connects
+            function onConnect() {
+                //alert("Connection Establised");
+            }
+
+            //function called when connection is lost
+            function onConnectionLost(responseObject) {
+                if (responseObject.errorCode !== 0) {
+                    //alert(client.clientId + "\n" + responseObject.errorCode);
+                }
+
+            }
+
+            //function called when a message arrives to client
+            function onMessageArrived(message) {
+                console.log(message.payloadString);
+
+                //Convert message string into JSON
+                var mess = JSON.parse(message.payloadString);
+                count += 1;
+                //Set the desired values
+                if (mess.Demographic_Gender === 'Male') {
+                    avgm += 1;
+                } else {
+                    avgf += 1;
+                }
+                avgAge += mess.Demographic_Age;
+
+                if (mess.Device_OS !== null && mess.Device_OS === 5) {
+                    avgiOS += 1;
+                } else {
+                    avgAndroid += 1;
+                }
+
+                //Call the drawChart function everytime the message arrives.
+                drawChart();
+            }
+
+            //The function to draw the charts.
+            function drawChart() {
+
+                // Set new Values for the
+                gaugeData.setValue(0, 1, avgf / count * 100);
+                gaugeData.setValue(1, 1, avgm / count * 100);
+
+                gaugeData1.setValue(0, 1, avgAge / count);
+
+                gaugeData2.setValue(0, 1, avgiOS / count * 100);
+                gaugeData2.setValue(1, 1, avgAndroid / count * 100);
+
+                // Draw the chart for individual dices
+                Vavgf.draw(gaugeData, gaugeOptions);
+                VavgAge.draw(gaugeData1, gaugeOptions);
+                VavgAndroid.draw(gaugeData2, gaugeOptions);
+
+            }
+
+        </script>
+        <title></title>
+    </head>
+    <body onload="doConnect()">
+        <button onclick="doSubscribe()" style="float: left">Subscribe</button>
+        <br/><br/><br/>
+        <div id="gauge">
+            <div id="chart_avgf" style="float: left"></div>
+
+            <div id="chart_avgAge" style="float: left"></div>
+
+            <div id="chart_avgAndroid" style="float: left"></div>
+        </div>
+    </body>
+</html>
